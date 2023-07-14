@@ -39,6 +39,10 @@ jobs:
         with:
           node-version: 'lts/*'
           cache: 'pnpm' # Set this to npm, yarn or pnpm.
+          
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 6.0.2
 
       - name: Install frontend dependencies
         # If you don't have `beforeBuildCommand` configured you may want to build your frontend here too.
