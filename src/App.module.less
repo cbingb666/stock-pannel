@@ -4,24 +4,24 @@
 .turnover {
   display: flex;
   align-items: center;
-  background-color: rgba(255, 124, 124, 0.15);
+  background-color: rgba(254, 188, 46, 0.15);
   height: 30px;
   font-size: 16px;
   padding: 4px 8px;
 }
 
-.upCount {
+.riseCount {
   display: flex;
   align-items: center;
-  background-color: rgba(254, 188, 46, 0.15);
+  // background-color: rgba(254, 188, 46, 0.15);
   height: 30px;
   font-size: 16px;
   padding: 4px 8px;
-  .high {
-    color: red;
+  &.high {
+    background-color: rgba(255, 0, 0, 0.4);
   }
-  .low {
-    color: blue;
+  &.low {
+    background-color: rgba(0, 0, 255, 0.4);
   }
 }
 
