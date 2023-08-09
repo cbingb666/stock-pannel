@@ -3,11 +3,10 @@ import style from "./App.module.less";
 import { Table } from "antd";
 import dayjs from "dayjs";
 import { IconFont } from "./components/Iconfont/Iconfont";
-import { useMount } from "ahooks";
+import { useAsyncEffect, useMount, useUnmount } from "ahooks";
 import { getKline, getMarketIndicatorData } from "./api";
 import { RecentTradingDay, recentTradingDay } from "./utils/stock";
 import {
-  delay,
   hhMM,
   isToday,
   unix2posix,
@@ -17,7 +16,6 @@ import {
 import { INDEX_CODES } from "./constants/stock";
 import Big from "big.js";
 import classnames from "classnames";
-import { Timeout } from "ahooks/lib/useRequest/src/types";
 
 /** 分时数据 */
 type TimeSegment = {
@@ -46,6 +44,7 @@ const TIME_SEGMENT = [
   "11:00",
   "13:00",
   "14:00",
+  "14:10",
   "15:00",
 ] as const;
 
@@ -81,7 +80,7 @@ const DateColumn = {
   title: "日期",
   dataIndex: "date",
   key: "date",
-  width: "150px",
+  width: "160px",
   render: (date: RecentTradingDay) => {
     return (
       <>
@@ -113,7 +112,7 @@ interface DataItem {
 function App() {
   /** 获取近期交易日 */
   const fetchRecentTradingDay = async () => {
-    const NEET_RECENT_TRADING_DAY = 20;
+    const NEET_RECENT_TRADING_DAY = 10;
     const res = await recentTradingDay(NEET_RECENT_TRADING_DAY);
     return res.filter((item) => item.isTradingDay);
   };
@@ -203,19 +202,21 @@ function App() {
         const item = {
           date,
           ...TIME_SEGMENT.reduce((acc, cur, index) => {
+            const todayStartDay = dayjs(`${date.date} 09:00`);
+            const curDay = dayjs(`${date.date} ${cur}`);
             const szTurnoverValue = turnoverValueLineSZ[date.date]
               ? calculateTotalTurnover(
                   turnoverValueLineSZ[date.date],
-                  dayjs(`${date.date} 09:00`),
-                  dayjs(`${date.date} ${cur}`)
+                  todayStartDay,
+                  curDay
                 )
               : undefined;
 
             const shTurnoverValue = turnoverValueLineSH[date.date]
               ? calculateTotalTurnover(
                   turnoverValueLineSH[date.date],
-                  dayjs(`${date.date} 09:00`),
-                  dayjs(`${date.date} ${cur}`)
+                  todayStartDay,
+                  curDay
                 )
               : undefined;
             const turnover =
@@ -223,13 +224,14 @@ function App() {
                 ? new Big(szTurnoverValue).add(shTurnoverValue).toFixed(0)
                 : undefined;
 
-            const rise_count = fallRise.find(
-              (item) => item.timestamp === dayjs(`${date.date} ${cur}`).unix()
-            )?.rise_count;
+            const rise_count = fallRise.find((item) => {
+              const timestamp = unix2posix(item.timestamp);
+              return timestamp === dayjs(`${date.date} ${cur}`).valueOf();
+            })?.rise_count;
 
             acc[cur] = {
               rise_count,
-              turnover,
+              turnover: curDay.valueOf() > Date.now() ? undefined : turnover,
             };
             return acc;
           }, {} as any),
@@ -244,29 +246,34 @@ function App() {
   /** 定时刷新 */
   let timer = useRef<any>(null);
   const refreshAtIntervals = async (dates: RecentTradingDay[]) => {
-    const refreshTime = Date.now();
+    let refreshTime = Date.now();
     timer.current = setInterval(() => {
       const timeSegments = TIME_SEGMENT.map((time) =>
         dayjs(`${yyyyMMdd(dayjs())} ${time}`).valueOf()
       ).filter((time) => time > refreshTime);
-      const isRefresh = timeSegments.find((time) => Date.now() >= time + 5000);
-      if (isRefresh) {
+      const nextRreshTime = timeSegments.find(
+        (time) => Date.now() >= time + 5000
+      );
+      if (nextRreshTime) {
+        console.log("refresh");
+        refreshTime = nextRreshTime;
         fetchInitData(dates);
       }
     }, 60);
   };
 
-  useEffect(() => {
-    return () => clearInterval(timer.current) 
-  })
-
   const [loading, setLoading] = useState(false);
+
   useMount(async () => {
     setLoading(true);
     const dates = await fetchRecentTradingDay();
     await fetchInitData(dates);
     setLoading(false);
     refreshAtIntervals(dates);
+  });
+
+  useUnmount(() => {
+    clearInterval(timer.current);
   });
 
   const [data, setData] = useState<IData[]>([]);

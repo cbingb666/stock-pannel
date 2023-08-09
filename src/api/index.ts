@@ -19,7 +19,7 @@ export const getKline = async (params: IGetKlineParams) => {
     {
       params: {
         ...params,
-        tick_count: 10000, // K线数量
+        tick_count: 5000, // K线数量
         adjust_price_type: "forward", // 调整价格类型
         period_type: 60, // K线周期类型(s)
         fields: 'tick_at,turnover_value'
