@@ -8,6 +8,7 @@ import { getKline, getMarketIndicatorData } from "./api";
 import { RecentTradingDay, recentTradingDay } from "./utils/stock";
 import {
   hhMM,
+  isSameDay,
   isToday,
   unix2posix,
   yyyyMMdd,
@@ -147,25 +148,32 @@ function App() {
     startDate: dayjs.ConfigType,
     endDate: dayjs.ConfigType
   ): number => {
-    return data
-      .reduce((total, item) => {
-        // 检查item的日期是否在所需的时间范围内
-        if (
-          item.tick_at >= dayjs(startDate).unix() &&
-          item.tick_at <= dayjs(endDate).unix()
-        ) {
-          total = total.add(item.turnover_value);
-        }
-        return total;
-      }, new Big(0))
-      .div(10e7)
-      .toNumber();
+    const startUnix = dayjs(startDate).unix();
+    const endUnix = dayjs(endDate).unix();
+
+    let total = new Big(0);
+    for (const item of data) {
+      const itemUnix = item.tick_at;
+      if (itemUnix >= startUnix && itemUnix <= endUnix) {
+        total = total.add(item.turnover_value);
+      }
+    }
+
+    return total.div(10e7).toNumber();
   };
 
   const fetchInitData = async (dates: RecentTradingDay[]) => {
-    const kLineRes = await getKline({
+    const kLinePromise = getKline({
       prod_code: `${INDEX_CODES.SZ},${INDEX_CODES.SH}`,
     });
+
+    const fallRisePromises = dates.map((date) => fetchFallRiseCount(date.date));
+
+    const [kLineRes, fallRiseCounts] = await Promise.all([
+      kLinePromise,
+      Promise.all(fallRisePromises),
+    ]);
+
 
     const turnoverValueLineSZ = groupByDate(
       kLineRes.data.data.candle[INDEX_CODES.SZ].lines
@@ -177,7 +185,6 @@ function App() {
         })
         .map((item) => {
           item.date = yyyyMMddHHmmss(unix2posix(item.tick_at));
-          item.turnover_value = item.turnover_value;
           return item;
         })
     );
@@ -192,54 +199,52 @@ function App() {
         })
         .map((item) => {
           item.date = yyyyMMddHHmmss(unix2posix(item.tick_at));
-          item.turnover_value = item.turnover_value;
           return item;
         })
     );
 
-    const res = await Promise.all(
-      dates.map(async (date) => {
-        const fallRise = await fetchFallRiseCount(date.date);
-        const item = {
-          date,
-          ...TIME_SEGMENT.reduce((acc, cur, index) => {
-            const todayStartDay = dayjs(`${date.date} 09:00`);
-            const curDay = dayjs(`${date.date} ${cur}`);
-            const szTurnoverValue = turnoverValueLineSZ[date.date]
-              ? calculateTotalTurnover(
-                  turnoverValueLineSZ[date.date],
-                  todayStartDay,
-                  curDay
-                )
+    const res = dates.map((date, index) => {
+      const fallRise = fallRiseCounts[index];
+
+      const item = {
+        date,
+        ...TIME_SEGMENT.reduce((acc, cur, index) => {
+          const todayStartDay = dayjs(`${date.date} 09:00`);
+          const curDay = dayjs(`${date.date} ${cur}`);
+          const szTurnoverValue = turnoverValueLineSZ[date.date]
+            ? calculateTotalTurnover(
+                turnoverValueLineSZ[date.date],
+                todayStartDay,
+                curDay
+              )
+            : undefined;
+
+          const shTurnoverValue = turnoverValueLineSH[date.date]
+            ? calculateTotalTurnover(
+                turnoverValueLineSH[date.date],
+                todayStartDay,
+                curDay
+              )
+            : undefined;
+          const turnover =
+            szTurnoverValue && shTurnoverValue
+              ? new Big(szTurnoverValue).add(shTurnoverValue).toFixed(0)
               : undefined;
 
-            const shTurnoverValue = turnoverValueLineSH[date.date]
-              ? calculateTotalTurnover(
-                  turnoverValueLineSH[date.date],
-                  todayStartDay,
-                  curDay
-                )
-              : undefined;
-            const turnover =
-              szTurnoverValue && shTurnoverValue
-                ? new Big(szTurnoverValue).add(shTurnoverValue).toFixed(0)
-                : undefined;
+          const rise_count = fallRise?.find((item) => {
+            const timestamp = unix2posix(item.timestamp);
+            return timestamp === dayjs(`${date.date} ${cur}`).valueOf();
+          })?.rise_count;
 
-            const rise_count = fallRise.find((item) => {
-              const timestamp = unix2posix(item.timestamp);
-              return timestamp === dayjs(`${date.date} ${cur}`).valueOf();
-            })?.rise_count;
-
-            acc[cur] = {
-              rise_count,
-              turnover: curDay.valueOf() > Date.now() ? undefined : turnover,
-            };
-            return acc;
-          }, {} as any),
-        };
-        return item;
-      })
-    );
+          acc[cur] = {
+            rise_count,
+            turnover: curDay.valueOf() > Date.now() ? undefined : turnover,
+          };
+          return acc;
+        }, {} as any),
+      };
+      return item;
+    });
 
     setData(res);
   };
@@ -265,18 +270,22 @@ function App() {
 
   const [loading, setLoading] = useState(false);
 
+  const renderRef = useRef(false)
   useEffect(() => {
+    if(renderRef.current) return 
+    renderRef.current = true;
+    
     (async () => {
       setLoading(true);
       const dates = await fetchRecentTradingDay();
       await fetchInitData(dates);
       setLoading(false);
       refreshAtIntervals(dates);
-    })()
+    })();
     return () => {
-      timer.current && clearInterval(timer.current)
-    }
-  }, [])
+      timer.current && clearInterval(timer.current);
+    };
+  }, []);
 
   const [data, setData] = useState<IData[]>([]);
 
