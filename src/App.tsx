@@ -16,6 +16,7 @@ import {
 import { INDEX_CODES } from "./constants/stock";
 import Big from "big.js";
 import classnames from "classnames";
+import { setInterval, clearInterval } from "worker-timers";
 
 /** 分时数据 */
 type TimeSegment = {
@@ -264,17 +265,18 @@ function App() {
 
   const [loading, setLoading] = useState(false);
 
-  useMount(async () => {
-    setLoading(true);
-    const dates = await fetchRecentTradingDay();
-    await fetchInitData(dates);
-    setLoading(false);
-    refreshAtIntervals(dates);
-  });
-
-  useUnmount(() => {
-    clearInterval(timer.current);
-  });
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      const dates = await fetchRecentTradingDay();
+      await fetchInitData(dates);
+      setLoading(false);
+      refreshAtIntervals(dates);
+    })()
+    return () => {
+      timer.current && clearInterval(timer.current)
+    }
+  }, [])
 
   const [data, setData] = useState<IData[]>([]);
 
