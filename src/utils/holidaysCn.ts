@@ -11,18 +11,42 @@ export type IHolidaysData = {
   isOffDay: boolean;
 };
 
+const HOLIDAYS_KEY = "holidays";
+
 /**
  * 中国节假日
  */
 export class HolidaysCn {
-
   holidaysData: { [key in string]: IHolidaysData[] } = {};
 
+  cacheLocalKey(year: number) {
+    return `${HOLIDAYS_KEY}_${year}`;
+  }
+
+  setCacheLocalData(year: number, data: any) {
+    localStorage.setItem(this.cacheLocalKey(year), JSON.stringify(data));
+  }
+
+  getCacheLocalData(year: number) {
+    const data = localStorage.getItem(this.cacheLocalKey(year));
+    return data ? JSON.parse(data) : data;
+  }
+
   /** 获取节假日数据 */
-  async fetchHolidays(year: number) {
+  async fetchHolidays(year: number, cache = true) {
+    if (cache) {
+      const cacheData = this.getCacheLocalData(year);
+      if (cacheData) {
+        this.holidaysData[year] = cacheData;
+        return this.holidaysData[year];
+      }
+    }
+
     const url = `https://ghproxy.com/https://raw.githubusercontent.com/NateScarlet/holiday-cn/master/${year}.json`;
     const response = await axios.get(url);
-    this.holidaysData[year] = response.data.days;
+    const days = response?.data?.days;
+    this.holidaysData[year] = days;
+    this.setCacheLocalData(year, days);
     return this.holidaysData[year];
   }
 
@@ -42,7 +66,7 @@ export class HolidaysCn {
 
   /** 获取指定年份节假日 */
   async getHoliday(year: number) {
-    return this.holidaysData[year] ?? await this.fetchHolidays(year);
+    return this.holidaysData[year] ?? (await this.fetchHolidays(year));
   }
 }
 
