@@ -285,6 +285,7 @@ function App() {
     return () => {
       timer.current && clearInterval(timer.current);
     };
+
   }, []);
 
   const [data, setData] = useState<IData[]>([]);
@@ -297,6 +298,7 @@ function App() {
         pagination={false}
         loading={loading}
       />
+      test
     </div>
   );
 }
