@@ -1,3 +1,12 @@
+
+
+# [0.2.0](https://github.com/cbingb666/stock-pannel/compare/v0.1.0...v0.2.0) (2023-08-10)
+
+
+### Features
+
+* :sparkles: 添加自动更新 ([aa64212](https://github.com/cbingb666/stock-pannel/commit/aa642129fb2df6bdd90ca1010e455600510a40ec))
+
 # [0.2.0](https://github.com/cbingb666/stock-pannel/compare/v0.1.1...v0.2.0) (2023-08-10)
 
 ### Features
