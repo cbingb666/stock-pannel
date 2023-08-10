@@ -3,12 +3,10 @@ import style from "./App.module.less";
 import { Table } from "antd";
 import dayjs from "dayjs";
 import { IconFont } from "./components/Iconfont/Iconfont";
-import { useAsyncEffect, useMount, useUnmount } from "ahooks";
 import { getKline, getMarketIndicatorData } from "./api";
 import { RecentTradingDay, recentTradingDay } from "./utils/stock";
 import {
   hhMM,
-  isSameDay,
   isToday,
   unix2posix,
   yyyyMMdd,
@@ -18,6 +16,8 @@ import { INDEX_CODES } from "./constants/stock";
 import Big from "big.js";
 import classnames from "classnames";
 import { setInterval, clearInterval } from "worker-timers";
+
+
 
 /** 分时数据 */
 type TimeSegment = {
@@ -174,7 +174,6 @@ function App() {
       Promise.all(fallRisePromises),
     ]);
 
-
     const turnoverValueLineSZ = groupByDate(
       kLineRes.data.data.candle[INDEX_CODES.SZ].lines
         .map((item) => {
@@ -207,6 +206,7 @@ function App() {
       const fallRise = fallRiseCounts[index];
 
       const item = {
+        key: date.date,
         date,
         ...TIME_SEGMENT.reduce((acc, cur, index) => {
           const todayStartDay = dayjs(`${date.date} 09:00`);
@@ -270,11 +270,11 @@ function App() {
 
   const [loading, setLoading] = useState(false);
 
-  const renderRef = useRef(false)
+  const renderRef = useRef(false);
   useEffect(() => {
-    if(renderRef.current) return 
+    if (renderRef.current) return;
     renderRef.current = true;
-    
+
     (async () => {
       setLoading(true);
       const dates = await fetchRecentTradingDay();
@@ -285,7 +285,6 @@ function App() {
     return () => {
       timer.current && clearInterval(timer.current);
     };
-
   }, []);
 
   const [data, setData] = useState<IData[]>([]);
@@ -298,7 +297,6 @@ function App() {
         pagination={false}
         loading={loading}
       />
-      test
     </div>
   );
 }
