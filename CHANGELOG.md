@@ -1,5 +1,12 @@
 
 
+## [0.2.1](https://github.com/cbingb666/stock-pannel/compare/v0.2.0...v0.2.1) (2023-08-11)
+
+
+### Bug Fixes
+
+* :bug: 延长刷新间隔时间 ([3ce5753](https://github.com/cbingb666/stock-pannel/commit/3ce5753cf97f0be54abf56c54f58c3899125ee6f))
+
 # [0.2.0](https://github.com/cbingb666/stock-pannel/compare/v0.1.0...v0.2.0) (2023-08-10)
 
 
