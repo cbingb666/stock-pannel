@@ -1,5 +1,12 @@
 
 
+## [0.2.2](https://github.com/cbingb666/stock-pannel/compare/v0.2.1...v0.2.2) (2023-08-11)
+
+
+### Bug Fixes
+
+* :bug: 避免多次弹出updater dialog ([498e9e6](https://github.com/cbingb666/stock-pannel/commit/498e9e6179f4ba30e597efb33cc0470bb449fdca))
+
 ## [0.2.1](https://github.com/cbingb666/stock-pannel/compare/v0.2.0...v0.2.1) (2023-08-11)
 
 
