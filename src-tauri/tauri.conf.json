@@ -42,8 +42,17 @@
         "icons/icon.ico"
       ],
       "windows": {
+        "nsis": {
+          "languages": [
+            "zh-CN",
+            "en-US"
+          ]
+        },
         "wix": {
-          "language": "zh-CN"
+          "language": [
+            "zh-CN",
+            "en-US"
+          ]
         }
       }
     },
