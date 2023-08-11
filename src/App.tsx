@@ -258,7 +258,7 @@ function App() {
         dayjs(`${yyyyMMdd(dayjs())} ${time}`).valueOf()
       ).filter((time) => time > refreshTime);
       const nextRreshTime = timeSegments.find(
-        (time) => Date.now() >= time + 5000
+        (time) => Date.now() >= time + 30000
       );
       if (nextRreshTime) {
         console.log("refresh");
