@@ -1,5 +1,12 @@
 
 
+## [0.3.2](https://github.com/cbingb666/stock-pannel/compare/v0.3.1...v0.3.2) (2023-08-11)
+
+
+### Bug Fixes
+
+* :bug: nsis languages error ([9d8db5f](https://github.com/cbingb666/stock-pannel/commit/9d8db5ff1bf42e4d86dfae1951952e97f4d28225))
+
 ## [0.3.1](https://github.com/cbingb666/stock-pannel/compare/v0.3.0...v0.3.1) (2023-08-11)
 
 # [0.3.0](https://github.com/cbingb666/stock-pannel/compare/v0.2.2...v0.3.0) (2023-08-11)
