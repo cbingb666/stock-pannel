@@ -1,5 +1,7 @@
 
 
+## [0.3.1](https://github.com/cbingb666/stock-pannel/compare/v0.3.0...v0.3.1) (2023-08-11)
+
 # [0.3.0](https://github.com/cbingb666/stock-pannel/compare/v0.2.2...v0.3.0) (2023-08-11)
 
 
