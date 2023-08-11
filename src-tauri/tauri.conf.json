@@ -44,8 +44,8 @@
       "windows": {
         "nsis": {
           "languages": [
-            "zh-CN",
-            "en-US"
+            "SimpChinese",
+            "English"
           ]
         },
         "wix": {
