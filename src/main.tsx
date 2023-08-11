@@ -16,12 +16,6 @@ import { checkUpdate } from "@tauri-apps/api/updater";
       throw new Error("设置窗口标题失败");
     }
   })();
-
-  /** 检查版本 */
-  (async () => {
-    const update = await checkUpdate();
-    console.log(update);
-  })();
 })();
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
