@@ -1,5 +1,12 @@
 
 
+# [0.3.0](https://github.com/cbingb666/stock-pannel/compare/v0.2.2...v0.3.0) (2023-08-11)
+
+
+### Features
+
+* :sparkles: windows msi安装包支持中文 ([40b7ea4](https://github.com/cbingb666/stock-pannel/commit/40b7ea4b332b0d734951c1a40db4caabe58dacca))
+
 ## [0.2.2](https://github.com/cbingb666/stock-pannel/compare/v0.2.1...v0.2.2) (2023-08-11)
 
 
