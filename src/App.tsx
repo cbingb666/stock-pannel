@@ -17,8 +17,6 @@ import Big from "big.js";
 import classnames from "classnames";
 import { setInterval, clearInterval } from "worker-timers";
 
-
-
 /** 分时数据 */
 type TimeSegment = {
   /** 成交额 */
@@ -296,7 +294,8 @@ function App() {
         columns={columns}
         pagination={false}
         loading={loading}
-      />
+        sticky
+      ></Table>
     </div>
   );
 }
