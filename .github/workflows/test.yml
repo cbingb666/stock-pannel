@@ -1,0 +1,32 @@
+name: test
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: install node
+        uses: actions/setup-node@v2
+        with:
+          node-version: '18'
+
+      - name: Make Changelog
+        id: changelog
+        run: | 
+          latest_tag=$(git describe --tags --abbrev=0)
+          changelog=$(npx auto-changelog --stdout --starting-version="$latest_tag" --template https://raw.githubusercontent.com/release-it/release-it/main/templates/changelog-compact.hbs)
+          echo "changelog=$(echo $changelog)" >> $GITHUB_OUTPUT
+          
+      - name: Log
+        run: | 
+         echo -e ${{ steps.changelog.outputs.changelog }}
+
