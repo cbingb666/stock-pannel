@@ -1,5 +1,10 @@
 import axios, { AxiosInstance, AxiosResponse } from "axios";
-import { XuanGuBaoRes } from "./index.types";
+
+export type XuanGuBaoRes<T> = {
+  code: number;
+  message: string;
+  data: T;
+};
 
 const XUANGUBAO_ERROR_CODE = 20000;
 
@@ -15,3 +20,4 @@ const xuangubaoErrorInterceptor = (
 };
 
 XgbAxios.interceptors.response.use(xuangubaoErrorInterceptor);
+

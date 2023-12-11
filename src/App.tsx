@@ -3,7 +3,11 @@ import style from "./App.module.less";
 import { Table } from "antd";
 import dayjs from "dayjs";
 import { IconFont } from "./components/Iconfont/Iconfont";
-import { getKline, getMarketIndicatorData } from "./api";
+import {
+  getIndexZhAHistMinEm,
+  getKlineFromXgb,
+  getRiseCountFromXgb,
+} from "./api";
 import { RecentTradingDay, recentTradingDay } from "./utils/stock";
 import {
   hhMM,
@@ -12,34 +16,40 @@ import {
   yyyyMMdd,
   yyyyMMddHHmmss,
 } from "./utils/time";
-import { INDEX_CODES } from "./constants/stock";
+import { INDEX_CODES, marketPreffix, marketSuffix } from "./constants/stock";
 import Big from "big.js";
 import classnames from "classnames";
 import { setInterval, clearInterval } from "worker-timers";
+import { marketCode } from "./utils/code";
+import { IMarketIndicatorData } from "./api/index.types";
+import _ from "lodash";
 
 /** 分时数据 */
 type TimeSegment = {
   /** 成交额 */
-  turnover: number;
+  turnover?: number;
   /** 上涨家数 */
-  rise_count: number;
+  rise_count?: number;
 };
 
 interface IData {
-  date: RecentTradingDay;
-  "09:25": TimeSegment;
-  "09:31": TimeSegment;
-  "10:00": TimeSegment;
-  "11:00": TimeSegment;
-  "13:00": TimeSegment;
-  "14:00": TimeSegment;
-  "15:00": TimeSegment;
+  day: RecentTradingDay;
+  timeSegments: TimeSegment[];
 }
+
+interface TurnoverData {
+  turnover_value: number;
+  tick_at: number;
+  date: string;
+}
+
+// 获取最近交易日天数
+const RECENT_TRADING_DAY = 10;
 
 // 时间分段
 const TIME_SEGMENT = [
   "09:25",
-  "09:31",
+  "09:35",
   "10:00",
   "11:00",
   "13:00",
@@ -48,28 +58,53 @@ const TIME_SEGMENT = [
   "15:00",
 ] as const;
 
+// 末日时间
+const DOOMSDAY_TIME = '20990101'
+
+// 获取涨跌数颜色
+function getRiseCountColor(rise_count?: number) {
+  let color = "";
+  if (rise_count !== undefined && rise_count !== null) {
+    if (rise_count <= 1000) {
+      color = style.low;
+    } else if (rise_count >= 3000) {
+      color = style.high;
+    }
+  }
+  return color;
+}
+
+// 自动占空符
+function autoEmptySymbol(value?: number | string) {
+  return value ?? "-";
+}
+
+// ICON 今日
+const IconToday = () => {
+  return (
+    <IconFont
+      className={style.icon}
+      type="icon-jintian"
+      style={{ fontSize: "20px" }}
+    ></IconFont>
+  );
+};
+
 // 时间段 Column
-const TimeSegmentColumns = TIME_SEGMENT.map((time) => ({
+const TimeSegmentColumns = TIME_SEGMENT.map((time, index) => ({
   title: time,
-  dataIndex: time,
+  dataIndex: "timeSegments",
   key: time,
   className: style.time,
-  render: (info?: TimeSegment) => {
-    let color = "";
-    if (info?.rise_count !== undefined) {
-      if (info.rise_count <= 1000) {
-        color = style.low;
-      } else if (info.rise_count >= 3000) {
-        color = style.high;
-      }
-    }
-
+  render: (timeSegments?: TimeSegment[]) => {
+    let info = timeSegments?.[index];
+    let color = getRiseCountColor(info?.rise_count);
     return (
       <>
         <div className={classnames(style.riseCount, color)}>
-          {info?.rise_count ?? "-"}
+          {autoEmptySymbol(info?.rise_count)}
         </div>
-        <div className={style.turnover}>{info?.turnover ?? "-"}</div>
+        <div className={style.turnover}>{autoEmptySymbol(info?.turnover)}</div>
       </>
     );
   },
@@ -78,71 +113,34 @@ const TimeSegmentColumns = TIME_SEGMENT.map((time) => ({
 // 日期 Column
 const DateColumn = {
   title: "日期",
-  dataIndex: "date",
-  key: "date",
+  dataIndex: "day",
+  key: "day",
   width: "160px",
-  render: (date: RecentTradingDay) => {
+  render: (day: RecentTradingDay) => {
     return (
       <>
         <div className={style.date}>
-          {date.date}
-          {isToday(date.date) ? (
-            <IconFont
-              className={style.icon}
-              type="icon-jintian"
-              style={{ fontSize: "20px" }}
-            ></IconFont>
-          ) : (
-            <></>
-          )}
+          {day.date}
+          {isToday(day.date) ? <IconToday></IconToday> : <></>}
         </div>
-        <div>{date.week}</div>
+        <div>{day.week}</div>
       </>
     );
   },
 };
+
+// Column
 const columns = [DateColumn, ...TimeSegmentColumns];
 
-interface DataItem {
-  turnover_value: number;
-  tick_at: number;
-  date: string;
-}
-
 function App() {
-  /** 获取近期交易日 */
-  const fetchRecentTradingDay = async () => {
-    const NEET_RECENT_TRADING_DAY = 10;
-    const res = await recentTradingDay(NEET_RECENT_TRADING_DAY);
-    return res.filter((item) => item.isTradingDay);
-  };
+  const [loading, setLoading] = useState(false);
+  const [data, setData] = useState<IData[]>([]);
+  const renderedRef = useRef(false);
+  const timer = useRef<any>(null);
 
-  /** 获取涨跌家数 */
-  const fetchFallRiseCount = async (date: dayjs.ConfigType) => {
-    const res = await getMarketIndicatorData(yyyyMMdd(date));
-    return res.data.data.filter((item) => {
-      return TIME_SEGMENT.includes(hhMM(unix2posix(item.timestamp)) as any);
-    });
-  };
-
-  const groupByDate = (data: DataItem[]): Record<string, DataItem[]> => {
-    const groups: Record<string, DataItem[]> = {};
-
-    for (const item of data) {
-      const date = item.date.split(" ")[0];
-
-      if (date in groups) {
-        groups[date].push(item);
-      } else {
-        groups[date] = [item];
-      }
-    }
-
-    return groups;
-  };
-
+  /** 合计成交额 */
   const calculateTotalTurnover = (
-    data: DataItem[],
+    data: TurnoverData[],
     startDate: dayjs.ConfigType,
     endDate: dayjs.ConfigType
   ): number => {
@@ -160,95 +158,7 @@ function App() {
     return total.div(10e7).toNumber();
   };
 
-  const fetchInitData = async (dates: RecentTradingDay[]) => {
-    const kLinePromise = getKline({
-      prod_code: `${INDEX_CODES.SZ},${INDEX_CODES.SH}`,
-    });
-
-    const fallRisePromises = dates.map((date) => fetchFallRiseCount(date.date));
-
-    const [kLineRes, fallRiseCounts] = await Promise.all([
-      kLinePromise,
-      Promise.all(fallRisePromises),
-    ]);
-
-    const turnoverValueLineSZ = groupByDate(
-      kLineRes.data.data.candle[INDEX_CODES.SZ].lines
-        .map((item) => {
-          return kLineRes.data.data.fields.reduce((acc, cur, index) => {
-            acc[cur] = item[index];
-            return acc;
-          }, {} as any);
-        })
-        .map((item) => {
-          item.date = yyyyMMddHHmmss(unix2posix(item.tick_at));
-          return item;
-        })
-    );
-
-    const turnoverValueLineSH = groupByDate(
-      kLineRes.data.data.candle[INDEX_CODES.SH].lines
-        .map((item) => {
-          return kLineRes.data.data.fields.reduce((acc, cur, index) => {
-            acc[cur] = item[index];
-            return acc;
-          }, {} as any);
-        })
-        .map((item) => {
-          item.date = yyyyMMddHHmmss(unix2posix(item.tick_at));
-          return item;
-        })
-    );
-
-    const res = dates.map((date, index) => {
-      const fallRise = fallRiseCounts[index];
-
-      const item = {
-        key: date.date,
-        date,
-        ...TIME_SEGMENT.reduce((acc, cur, index) => {
-          const todayStartDay = dayjs(`${date.date} 09:00`);
-          const curDay = dayjs(`${date.date} ${cur}`);
-          const szTurnoverValue = turnoverValueLineSZ[date.date]
-            ? calculateTotalTurnover(
-                turnoverValueLineSZ[date.date],
-                todayStartDay,
-                curDay
-              )
-            : undefined;
-
-          const shTurnoverValue = turnoverValueLineSH[date.date]
-            ? calculateTotalTurnover(
-                turnoverValueLineSH[date.date],
-                todayStartDay,
-                curDay
-              )
-            : undefined;
-          const turnover =
-            szTurnoverValue && shTurnoverValue
-              ? new Big(szTurnoverValue).add(shTurnoverValue).toFixed(0)
-              : undefined;
-
-          const rise_count = fallRise?.find((item) => {
-            const timestamp = unix2posix(item.timestamp);
-            return timestamp === dayjs(`${date.date} ${cur}`).valueOf();
-          })?.rise_count;
-
-          acc[cur] = {
-            rise_count,
-            turnover: curDay.valueOf() > Date.now() ? undefined : turnover,
-          };
-          return acc;
-        }, {} as any),
-      };
-      return item;
-    });
-
-    setData(res);
-  };
-
   /** 定时刷新 */
-  let timer = useRef<any>(null);
   const refreshAtIntervals = async (dates: RecentTradingDay[]) => {
     let refreshTime = Date.now();
     timer.current = setInterval(() => {
@@ -261,31 +171,145 @@ function App() {
       if (nextRreshTime) {
         console.log("refresh");
         refreshTime = nextRreshTime;
-        fetchInitData(dates);
+        fetchTimeSegmentData(dates);
       }
     }, 60);
   };
 
-  const [loading, setLoading] = useState(false);
+  /** 获取近期交易日 */
+  const fetchRecentTradingDay = async () => {
+    const res = await recentTradingDay(RECENT_TRADING_DAY);
+    return res.filter((item) => item.isTradingDay);
+  };
 
-  const renderRef = useRef(false);
+  /** 获取单日涨家数 */
+  const fetchRiseCount = async (date: dayjs.ConfigType) => {
+    const res = await getRiseCountFromXgb(yyyyMMdd(date));
+    return res.data.data
+      .filter((item) => {
+        return TIME_SEGMENT.includes(hhMM(unix2posix(item.timestamp)) as any);
+      })
+      .map((i) => i.rise_count);
+  };
+
+  /** 获取跌家数 */
+  const fetchRiseCountInRange = (dates: RecentTradingDay[]) =>
+    Promise.all(dates.map((date) => fetchRiseCount(date.date)));
+
+  /** 获取交易额 - 选股宝 */
+  const fetchTurnoverFromXbg = async (code: string) => {
+    code = marketSuffix(code)
+    const res = await getKlineFromXgb({ prod_code: [code] });
+    const data = res.data.data;
+    const line = _.map(
+      data.candle[code].lines,
+      (item) => _.zipObject(data.fields, item) as unknown as TurnoverData
+    );
+    return line;
+  };
+
+  /** 获取交易额 - 东方财富 */
+  const fetchTurnoverFromEm = async (code: string) => {
+    const data = await getIndexZhAHistMinEm({
+      code: marketPreffix(code),
+      period: 5,
+      start_date: "0",
+      end_date: DOOMSDAY_TIME,
+    });
+    return data.map(item => {
+      return {
+        turnover_value: item.cje,
+        tick_at: dayjs(item.date).unix(),
+        date: item.date
+      } as unknown as TurnoverData
+    })
+  };
+
+  /** 获取交易额 */
+  const fetchTurnover = async (dates: RecentTradingDay[]) => {
+    const lines = await Promise.all(
+      [INDEX_CODES.SH, INDEX_CODES.SZ].map(async (code) => {
+        // return fetchTurnoverFromXbg(code);
+        return fetchTurnoverFromEm(code)
+      })
+    );
+
+    // 日
+    const d = dates.map((date) => {
+      // 分时
+      return TIME_SEGMENT.map((time) => {
+        const start = dayjs(`${date.date} 09:00`);
+        const end = dayjs(`${date.date} ${time}`);
+
+        if (end.unix() > dayjs().unix()) {
+          return undefined;
+        }
+
+        // 指数
+        return Number(
+          lines
+            .reduce((acc, cur) => {
+              const val = calculateTotalTurnover(cur, start, end);
+              acc = acc.add(val);
+              return acc;
+            }, new Big(0))
+            .toFixed(0)
+        );
+      });
+    });
+    return d;
+  };
+
+  /** 渲染日历 */
+  const renderTradingDay = (
+    tradingDays: RecentTradingDay[],
+    riseCountData?: (number | undefined)[][],
+    turnoverData?: (number | undefined)[][]
+  ) => {
+    const data = tradingDays.map((day, dateIndex) => {
+      return {
+        key: day.date,
+        day: day,
+        timeSegments: TIME_SEGMENT.map((_, timeIndex) => {
+          return {
+            rise_count: riseCountData?.[dateIndex][timeIndex],
+            turnover: turnoverData?.[dateIndex][timeIndex],
+          };
+        }),
+      };
+    });
+    return setData(data);
+  };
+
+  /** 获取分时数据 */
+  const fetchTimeSegmentData = async (tradingDays: RecentTradingDay[]) => {
+    const riseCountData = await fetchRiseCountInRange(tradingDays);
+    renderTradingDay(tradingDays, riseCountData);
+
+    const turnoverData = await fetchTurnover(tradingDays);
+    renderTradingDay(tradingDays, riseCountData, turnoverData);
+  };
+
   useEffect(() => {
-    if (renderRef.current) return;
-    renderRef.current = true;
+    if (renderedRef.current) return;
+    renderedRef.current = true;
 
     (async () => {
       setLoading(true);
-      const dates = await fetchRecentTradingDay();
-      await fetchInitData(dates);
+
+      const tradingDay = await fetchRecentTradingDay();
+      renderTradingDay(tradingDay);
+
+      await fetchTimeSegmentData(tradingDay);
+
       setLoading(false);
-      refreshAtIntervals(dates);
+
+      refreshAtIntervals(tradingDay);
     })();
     return () => {
       timer.current && clearInterval(timer.current);
     };
   }, []);
-
-  const [data, setData] = useState<IData[]>([]);
 
   return (
     <div className={style.container}>

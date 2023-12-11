@@ -42,7 +42,7 @@ export class HolidaysCn {
       }
     }
 
-    const url = `https://ghproxy.com/https://raw.githubusercontent.com/NateScarlet/holiday-cn/master/${year}.json`;
+    const url = `https://gh.bingeek.com/https://raw.githubusercontent.com/NateScarlet/holiday-cn/master/${year}.json`;
     const response = await axios.get(url);
     const days = response?.data?.days;
     this.holidaysData[year] = days;

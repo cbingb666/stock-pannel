@@ -1,13 +1,8 @@
-export type XuanGuBaoRes<T> = {
-  code: number;
-  message: string;
-  data: T;
-};
+import { XuanGuBaoRes } from "./utils/xuangubao";
 
 export type IMarketIndicatorData = {
-  rise_count: number;
-  fall_count: number;
-  timestamp: number;
+  rise_count: number; // 涨家数
+  timestamp: number;  // 日期时间
 };
 export type IGetMarketIndicatorDataRes = XuanGuBaoRes<IMarketIndicatorData[]>;
 
@@ -22,7 +17,7 @@ export interface ICandleData {
 }
 
 export type IGetKlineParams = {
-  prod_code: string; // 产品代码
+  prod_code: string[]; // 产品代码
 }
 
 // 定义API响应的接口
